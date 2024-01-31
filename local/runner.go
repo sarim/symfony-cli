@@ -277,14 +277,20 @@ func (r *Runner) buildCmd() (*exec.Cmd, error) {
 	cmd.Env = os.Environ()
 	cmd.Dir = r.pidFile.Dir
 
-	if err := buildCmd(cmd); err != nil {
+	isInteractive := r.mode == RunnerModeOnce && terminal.Stdin.IsInteractive() && len(r.pidFile.Watched) == 0
+
+	if err := buildCmd(cmd, !isInteractive); err != nil {
 		return nil, err
 	}
 
 	if r.mode == RunnerModeOnce {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		cmd.Stdin = os.Stdin
+		if isInteractive {
+			cmd.Stdin = os.Stdin
+		} else {
+			cmd.Stdin = nil // Set nil otherwise golang's default behavior of piping goroutine will hang
+		}
 	} else if logWriter, err := r.pidFile.LogWriter(); err != nil {
 		return nil, errors.WithStack(err)
 	} else {
